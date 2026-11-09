@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดผังและสุ่มการแข่งขัน</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Kanit -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fef2f2',
+                            100: '#ffe1e1',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            900: '#7f1d1d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
+        }
+        /* Custom light scrollbar */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
+
+        <!-- Left Sidebar: Controls & Team Management -->
+        <aside class="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-5 no-print">
+            
+            <!-- Tournament Settings Card -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div class="flex items-center gap-2 mb-4 pb-2.5 border-b border-slate-100">
+                    <div class="w-2.5 h-5 bg-red-600 rounded-full"></div>
+                    <h2 class="text-base font-bold text-slate-900">
+                        ตั้งค่าการแข่งขัน
+                    </h2>
+                </div>
+                
+                <div class="space-y-4">
+                    <!-- Tournament Name -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">ชื่อรายการ / กิจกรรม</label>
+                        <input type="text" id="tournament-name" value="รายการแข่งขัน" 
+                            onchange="generateBracket()"
+                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-100 transition">
+                    </div>
+
+                    <!-- Tournament Format -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">รูปแบบการแข่งขัน</label>
+                        <select id="tournament-format" onchange="generateBracket()" 
+                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-100 transition">
+                            <option value="knockout">แพ้คัดออก (Single Elimination)</option>
+                            <option value="roundrobin">พบกันหมด (Round Robin)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team / Player List Management Card -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col">
+                <div class="flex items-center justify-between mb-4 pb-2.5 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-5 bg-red-600 rounded-full"></div>
+                        <h2 class="text-base font-bold text-slate-900">
+                            รายชื่อผู้แข่งขัน (<span id="team-count" class="text-red-600">0</span>)
+                        </h2>
+                    </div>
+                    <button onclick="clearAllTeams()" class="text-xs text-slate-400 hover:text-red-600 transition font-medium">
+                        [ล้างทั้งหมด]
+                    </button>
+                </div>
+
+                <!-- Input Box (Single Add) -->
+                <div class="space-y-2 mb-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input type="text" id="new-team-input" placeholder="ชื่อผู้แข่งขัน..." 
+                            onkeydown="if(event.key==='Enter') addTeam()"
+                            class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-100 transition">
+                        <input type="text" id="new-team-affiliation" placeholder="สังกัด / ทีม (ถ้ามี)..." 
+                            onkeydown="if(event.key==='Enter') addTeam()"
+                            class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-100 transition">
+                    </div>
+                    <button onclick="addTeam()" class="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold py-2 rounded-xl text-sm transition shadow-sm">
+                        + เพิ่มผู้แข่งขัน
+                    </button>
+                </div>
+
+                <!-- Bulk Paste -->
+                <details class="mb-3 group">
+                    <summary class="text-xs text-slate-500 hover:text-red-600 cursor-pointer select-none font-medium transition py-1">
+                        + วางรายชื่อพร้อมสังกัดทีละหลายคน (Bulk Add)
+                    </summary>
+                    <div class="mt-2 space-y-2">
+                        <textarea id="bulk-teams-input" rows="4" placeholder="วางรายชื่อแยกบรรทัด (คัดลอกจาก Excel หรือพิมพ์เว้นวรรคได้เลย) เช่น:&#10;สมชาย ทีมมังกร&#10;นาย A - ทีมเสือ&#10;นาย B (ทีมหงส์)"
+                            class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-100"></textarea>
+                        <button onclick="addBulkTeams()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 rounded-xl transition">
+                            เพิ่มรายชื่อทั้งหมด
+                        </button>
+                    </div>
+                </details>
+
+                <!-- Scrollable Teams List -->
+                <div id="teams-list" class="max-h-56 overflow-y-auto space-y-2 pr-1 custom-scroll my-2">
+                    <!-- Teams injected here dynamically -->
+                </div>
+
+                <!-- Action Button: Generate Bracket -->
+                <div class="pt-3 border-t border-slate-100 space-y-2 mt-2">
+                    <button onclick="shuffleAndGenerate()" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition shadow-sm">
+                        สุ่มจับสายแข่งขันทันที
+                    </button>
+                    <button onclick="generateBracket()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-xl transition">
+                        อัปเดตผังการแข่ง
+                    </button>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Right Main Panel: Bracket Visualization -->
+        <section class="flex-1 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col min-h-[550px]">
+            
+            <!-- Bracket Header Info -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-7 bg-red-600 rounded-full"></div>
+                    <div>
+                        <span class="inline-block text-xs font-bold text-red-600 tracking-wider uppercase">
+                            ผังการแข่งขัน
+                        </span>
+                        <h2 id="display-tournament-title" class="text-lg sm:text-xl font-extrabold text-slate-900">
+                            ผังการแข่งขัน
+                        </h2>
+                    </div>
+                </div>
+                
+                <!-- Status & Stats -->
+                <div class="flex items-center gap-2.5 text-xs">
+                    <div class="bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-600">
+                        จำนวนรายชื่อ: <strong id="stat-teams" class="text-slate-900 font-bold">0</strong>
+                    </div>
+                    <div class="bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-600">
+                        แมตช์ทั้งหมด: <strong id="stat-matches" class="text-slate-900 font-bold">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Champion Banner (Hidden by default) -->
+            <div id="champion-banner" class="hidden my-4 p-5 bg-red-50 border-2 border-red-200 rounded-2xl text-center shadow-sm">
+                <div class="inline-block px-3 py-1 bg-red-600 text-white text-[11px] font-bold rounded-full mb-2 tracking-wide uppercase">
+                    ชนะเลิศประจำรายการ
+                </div>
+                <h3 class="text-xs font-medium text-slate-500">ผู้ชนะเลิศ</h3>
+                <p id="champion-name" class="text-2xl font-black text-red-600 mt-0.5">ชื่อผู้ชนะ</p>
+            </div>
+
+            <!-- Bracket Container -->
+            <div class="flex-1 overflow-auto pt-6 pb-4 custom-scroll w-full" id="bracket-wrapper">
+                
+                <!-- Bracket View Content injected here -->
+                <div id="bracket-display" class="flex gap-2 sm:gap-4 min-w-max p-2 items-stretch justify-start">
+                    <!-- Dynamic Round Columns & Connectors -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="text-center py-20 px-4 max-w-sm mx-auto">
+                    <div class="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-3 font-bold text-lg border border-red-100">
+                        !
+                    </div>
+                    <h3 class="text-base font-bold text-slate-800 mb-1">ยังไม่มีผังการแข่งขัน</h3>
+                    <p class="text-xs text-slate-500">กรุณากรอกรายชื่อผู้แข่งขันอย่างน้อย 2 รายชื่อขึ้นไปที่แถบเมนูด้านซ้ายมือ</p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Application Script -->
+    <script>
+        // Global App State - Each team: { name: string, affiliation: string }
+        let teams = [];
+        let matches = [];
+        let rrMatches = [];
+
+        // Parse text line into { name, affiliation }
+        function parseParticipantText(str) {
+            str = str.trim();
+            if (!str) return null;
+
+            // 1. Check bracket format: Name (Team)
+            const bracketMatch = str.match(/^(.*?)\s*[\(\（](.*?)[\)\）]\s*$/);
+            if (bracketMatch && bracketMatch[1].trim()) {
+                return { name: bracketMatch[1].trim(), affiliation: bracketMatch[2].trim() };
+            }
+
+            // 2. Check Tab separator (Excel / Google Sheets paste)
+            if (str.includes('\t')) {
+                const parts = str.split('\t');
+                return { name: parts[0].trim(), affiliation: parts.slice(1).join(' ').trim() };
+            }
+
+            // 3. Check explicit delimiters: ' - ', '-', ',', '|'
+            const delimiters = [' - ', '-', ',', '|'];
+            for (let d of delimiters) {
+                if (str.includes(d)) {
+                    const parts = str.split(d);
+                    const name = parts[0].trim();
+                    const affiliation = parts.slice(1).join(d).trim();
+                    if (name) {
+                        return { name, affiliation };
+                    }
+                }
+            }
+
+            // 4. Check multiple spaces (2 or more spaces)
+            if (/\s{2,}/.test(str)) {
+                const parts = str.split(/\s{2,}/);
+                return { name: parts[0].trim(), affiliation: parts.slice(1).join(' ').trim() };
+            }
+
+            // 5. Fallback for single space separation: "Name Team"
+            if (str.includes(' ')) {
+                const firstSpaceIdx = str.indexOf(' ');
+                const name = str.substring(0, firstSpaceIdx).trim();
+                const affiliation = str.substring(firstSpaceIdx + 1).trim();
+                if (name && affiliation) {
+                    return { name, affiliation };
+                }
+            }
+
+            return { name: str, affiliation: '' };
+        }
+
+        // Safe Initialization Handler
+        function initApp() {
+            teams = [];
+            for (let i = 1; i <= 8; i++) {
+                teams.push({
+                    name: `ผู้แข่งขัน ${i}`,
+                    affiliation: `สังกัด ${String.fromCharCode(64 + i)}`
+                });
+            }
+            updateTeamsUI();
+            generateBracket();
+        }
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(initApp, 50);
+        } else {
+            document.addEventListener('DOMContentLoaded', initApp);
+        }
+
+        // Add Single Team
+        function addTeam() {
+            const nameInput = document.getElementById('new-team-input');
+            const affInput = document.getElementById('new-team-affiliation');
+            
+            const rawName = nameInput.value.trim();
+            const rawAff = affInput.value.trim();
+
+            if (!rawName) return;
+
+            if (!rawAff) {
+                const parsed = parseParticipantText(rawName);
+                if (parsed) {
+                    teams.push(parsed);
+                } else {
+                    teams.push({ name: rawName, affiliation: '' });
+                }
+            } else {
+                teams.push({
+                    name: rawName,
+                    affiliation: rawAff
+                });
+            }
+
+            nameInput.value = '';
+            affInput.value = '';
+            nameInput.focus();
+            updateTeamsUI();
+            generateBracket();
+        }
+
+        // Add Bulk Teams
+        function addBulkTeams() {
+            const textarea = document.getElementById('bulk-teams-input');
+            const lines = textarea.value.split('\n');
+            
+            let addedCount = 0;
+            lines.forEach(line => {
+                const item = parseParticipantText(line);
+                if (item) {
+                    teams.push(item);
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                textarea.value = '';
+                updateTeamsUI();
+                generateBracket();
+            }
+        }
+
+        // Remove Team
+        function removeTeam(index) {
+            teams.splice(index, 1);
+            updateTeamsUI();
+            generateBracket();
+        }
+
+        // Clear All Teams
+        function clearAllTeams() {
+            teams = [];
+            updateTeamsUI();
+            generateBracket();
+        }
+
+        // Helper to format participant item object
+        function getParticipantObj(item) {
+            if (typeof item === 'string') {
+                return parseParticipantText(item) || { name: item, affiliation: '' };
+            }
+            return item || { name: '', affiliation: '' };
+        }
+
+        // Helper to display label string
+        function getDisplayLabel(item, num) {
+            const p = getParticipantObj(item);
+            if (!p.name) return '';
+            const prefix = num ? `${num}. ` : '';
+            return p.affiliation ? `${prefix}${p.name} (${p.affiliation})` : `${prefix}${p.name}`;
+        }
+
+        // Render Left Sidebar Teams List
+        function updateTeamsUI() {
+            const listEl = document.getElementById('teams-list');
+            const countEl = document.getElementById('team-count');
+            countEl.textContent = teams.length;
+
+            if (teams.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-5 border border-dashed border-slate-200 rounded-xl">ยังไม่มีรายชื่อผู้แข่งขัน</p>`;
+                return;
+            }
+
+            listEl.innerHTML = teams.map((team, idx) => {
+                const p = getParticipantObj(team);
+                return `
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs hover:border-slate-300 transition">
+                    <span class="font-medium text-slate-700 flex items-center gap-2 truncate">
+                        <span class="w-5 h-5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                            ${idx + 1}
+                        </span>
+                        <span class="truncate">
+                            <strong class="text-slate-900 font-medium">${escapeHtml(p.name)}</strong>
+                            ${p.affiliation ? `<span class="text-[10px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md ml-1 truncate inline-block max-w-[110px]">${escapeHtml(p.affiliation)}</span>` : ''}
+                        </span>
+                    </span>
+                    <button onclick="removeTeam(${idx})" class="text-slate-400 hover:text-red-600 font-medium px-1 flex-shrink-0 transition">
+                        ลบ
+                    </button>
+                </div>
+            `}).join('');
+        }
+
+        // Instant Random Shuffle & Bracket Regeneration
+        function shuffleAndGenerate() {
+            if (teams.length < 2) {
+                alertModal("กรุณาเพิ่มรายชื่อผู้แข่งขันอย่างน้อย 2 ทีม");
+                return;
+            }
+            shuffleArray(teams);
+            updateTeamsUI();
+            generateBracket();
+        }
+
+        // Fisher-Yates Shuffle Algorithm
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // Master Bracket Controller
+        function generateBracket() {
+            const format = document.getElementById('tournament-format').value;
+            const titleInput = document.getElementById('tournament-name').value;
+
+            document.getElementById('display-tournament-title').textContent = titleInput || "ผังการแข่งขัน";
+            document.getElementById('stat-teams').textContent = teams.length;
+            document.getElementById('champion-banner').classList.add('hidden');
+
+            const bracketDisplay = document.getElementById('bracket-display');
+            const emptyState = document.getElementById('empty-state');
+
+            if (teams.length < 2) {
+                bracketDisplay.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                document.getElementById('stat-matches').textContent = '0';
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            if (format === 'knockout') {
+                buildKnockoutBracket();
+            } else if (format === 'roundrobin') {
+                buildRoundRobinStandings();
+            }
+        }
+
+        // Knockout (Single Elimination) - Sequential Top-to-Bottom Pairing with BYE
+        function buildKnockoutBracket() {
+            const participantList = [...teams];
+            const numTeams = participantList.length;
+
+            const totalRounds = Math.ceil(Math.log2(numTeams));
+            const bracketSize = Math.pow(2, totalRounds);
+            const numR1Matches = bracketSize / 2;
+
+            matches = [];
+
+            const numFullMatches = numTeams - numR1Matches;
+            let r1Matches = [];
+            let pIdx = 0;
+
+            for (let i = 0; i < numR1Matches; i++) {
+                let t1, t2, winner = null;
+
+                if (i < numFullMatches) {
+                    const p1 = getParticipantObj(participantList[pIdx]);
+                    t1 = { name: p1.name, affiliation: p1.affiliation, num: pIdx + 1 };
+                    pIdx++;
+
+                    const p2 = getParticipantObj(participantList[pIdx]);
+                    t2 = { name: p2.name, affiliation: p2.affiliation, num: pIdx + 1 };
+                    pIdx++;
+                } else {
+                    const p1 = getParticipantObj(participantList[pIdx]);
+                    t1 = { name: p1.name, affiliation: p1.affiliation, num: pIdx + 1 };
+                    pIdx++;
+                    t2 = { name: "BYE", affiliation: "", isBye: true };
+                    winner = t1;
+                }
+
+                r1Matches.push({
+                    id: `r1-m${i}`,
+                    round: 1,
+                    team1: t1,
+                    team2: t2,
+                    winner: winner
+                });
+            }
+            matches.push(r1Matches);
+
+            for (let r = 2; r <= totalRounds; r++) {
+                const prevRound = matches[r - 2];
+                let roundMatches = [];
+                for (let i = 0; i < prevRound.length; i += 2) {
+                    const prevM1 = prevRound[i];
+                    const prevM2 = prevRound[i + 1];
+
+                    let t1Obj = prevM1 && prevM1.winner ? prevM1.winner : { name: `ผู้ชนะ R${r-1}-M${i+1}`, affiliation: "", num: null };
+                    let t2Obj = prevM2 && prevM2.winner ? prevM2.winner : { name: `ผู้ชนะ R${r-1}-M${i+2}`, affiliation: "", num: null };
+
+                    roundMatches.push({
+                        id: `r${r}-m${i/2}`,
+                        round: r,
+                        team1: t1Obj,
+                        team2: t2Obj,
+                        winner: null
+                    });
+                }
+                matches.push(roundMatches);
+            }
+
+            for (let i = 0; i < r1Matches.length; i++) {
+                if (r1Matches[i].winner) {
+                    propagateWinner(0, r1Matches[i].id, r1Matches[i].winner);
+                }
+            }
+
+            const totalMatchesCount = matches.reduce((acc, r) => acc + r.length, 0);
+            document.getElementById('stat-matches').textContent = totalMatchesCount;
+
+            renderKnockoutUI(totalRounds);
+        }
+
+        // Render Knockout Visual UI with Light Fishbone Connectors
+        function renderKnockoutUI(totalRounds) {
+            const display = document.getElementById('bracket-display');
+            display.innerHTML = '';
+
+            matches.forEach((roundMatches, roundIdx) => {
+                const roundNum = roundIdx + 1;
+                const distance = totalRounds - roundNum;
+                let rName = "";
+
+                if (distance === 0) {
+                    rName = "รอบชิงชนะเลิศ";
+                } else if (distance === 1) {
+                    rName = "รอบรองชนะเลิศ";
+                } else if (distance === 2) {
+                    rName = "รอบก่อนรองชนะเลิศ";
+                } else if (roundNum === 1) {
+                    rName = "รอบแรก";
+                } else {
+                    const teamsInRound = Math.pow(2, distance + 1);
+                    rName = `รอบ ${teamsInRound} รายชื่อ`;
+                }
+
+                const col = document.createElement('div');
+                col.className = "flex flex-col justify-around min-w-[300px] sm:min-w-[340px] space-y-6";
+
+                const roundHeader = document.createElement('div');
+                roundHeader.className = "text-center mb-2 flex-shrink-0";
+                roundHeader.innerHTML = `
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-red-600 bg-red-50 py-1.5 px-3 rounded-xl border border-red-100">
+                        ${rName}
+                    </h4>
+                `;
+                col.appendChild(roundHeader);
+
+                const matchesDiv = document.createElement('div');
+                matchesDiv.className = "flex flex-col justify-around flex-1 space-y-6";
+
+                roundMatches.forEach((m, mIdx) => {
+                    const matchBox = document.createElement('div');
+                    const isFinal = (roundNum === totalRounds);
+
+                    matchBox.className = `bg-white border ${isFinal ? 'border-red-500 shadow-md ring-2 ring-red-100' : 'border-slate-200'} rounded-2xl p-3.5 shadow-sm flex flex-col justify-center min-h-[110px] transition`;
+
+                    const t1IsBye = m.team1.name === "BYE";
+                    const t2IsBye = m.team2.name === "BYE";
+
+                    const t1IsWinner = m.winner && m.winner.name === m.team1.name;
+                    const t2IsWinner = m.winner && m.winner.name === m.team2.name;
+
+                    const t1Label = getDisplayLabel(m.team1, m.team1.num);
+                    const t2Label = getDisplayLabel(m.team2, m.team2.num);
+
+                    let t1BtnClass = t1IsWinner ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : (t2IsWinner ? 'bg-slate-50 border-slate-200 text-slate-400 opacity-70' : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100');
+                    let t2BtnClass = t2IsWinner ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : (t1IsWinner ? 'bg-slate-50 border-slate-200 text-slate-400 opacity-70' : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100');
+
+                    if (t1IsBye) t1BtnClass = 'bg-slate-50 border-dashed border-slate-200 text-slate-400 cursor-not-allowed';
+                    if (t2IsBye) t2BtnClass = 'bg-slate-50 border-dashed border-slate-200 text-slate-400 cursor-not-allowed';
+
+                    let t1BadgeText = t1IsWinner ? (t2IsBye ? 'ผ่านเข้ารอบ' : 'ชนะ') : (t2IsWinner ? 'แพ้' : 'กดชนะ');
+                    let t2BadgeText = t2IsWinner ? (t1IsBye ? 'ผ่านเข้ารอบ' : 'ชนะ') : (t1IsWinner ? 'แพ้' : 'กดชนะ');
+
+                    if (t1IsBye) t1BadgeText = '-';
+                    if (t2IsBye) t2BadgeText = '-';
+
+                    let t1BadgeClass = t1IsWinner ? 'bg-emerald-600 text-white' : (t2IsWinner ? 'bg-slate-200 text-slate-500' : 'bg-white border border-slate-200 text-slate-600 hover:bg-red-600 hover:text-white hover:border-red-600');
+                    let t2BadgeClass = t2IsWinner ? 'bg-emerald-600 text-white' : (t1IsWinner ? 'bg-slate-200 text-slate-500' : 'bg-white border border-slate-200 text-slate-600 hover:bg-red-600 hover:text-white hover:border-red-600');
+
+                    if (t1IsBye) t1BadgeClass = 'bg-slate-100 text-slate-400';
+                    if (t2IsBye) t2BadgeClass = 'bg-slate-100 text-slate-400';
+
+                    matchBox.innerHTML = `
+                        <div class="text-[10px] text-slate-400 font-mono mb-2 flex justify-between items-center">
+                            <span>แมตช์ที่ ${mIdx + 1}</span>
+                            ${m.winner ? '<span class="text-emerald-600 font-bold">[ ได้ผู้ชนะแล้ว ]</span>' : '<span class="text-slate-400">[ กดเลือกผู้ชนะ ]</span>'}
+                        </div>
+                        <div class="space-y-2">
+                            <!-- Team 1 Option -->
+                            <button ${t1IsBye || t2IsBye ? 'disabled' : `onclick="setWinner('${m.id}', 1)"`} 
+                                class="w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition ${t1BtnClass}">
+                                <span class="text-xs break-words font-medium leading-snug pr-2" title="${escapeHtml(t1Label)}">
+                                    ${escapeHtml(t1Label)}
+                                </span>
+                                <span class="text-[10px] font-bold px-2.5 py-1 rounded-lg flex-shrink-0 transition ${t1BadgeClass}">
+                                    ${t1BadgeText}
+                                </span>
+                            </button>
+
+                            <!-- Team 2 Option -->
+                            <button ${t1IsBye || t2IsBye ? 'disabled' : `onclick="setWinner('${m.id}', 2)"`} 
+                                class="w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition ${t2BtnClass}">
+                                <span class="text-xs break-words font-medium leading-snug pr-2" title="${escapeHtml(t2Label)}">
+                                    ${escapeHtml(t2Label)}
+                                </span>
+                                <span class="text-[10px] font-bold px-2.5 py-1 rounded-lg flex-shrink-0 transition ${t2BadgeClass}">
+                                    ${t2BadgeText}
+                                </span>
+                            </button>
+                        </div>
+                    `;
+                    matchesDiv.appendChild(matchBox);
+                });
+
+                col.appendChild(matchesDiv);
+                display.appendChild(col);
+
+                // Add Fishbone Connector Column between current round & next round
+                if (roundNum < totalRounds) {
+                    const connectorCol = document.createElement('div');
+                    connectorCol.className = "flex flex-col justify-around w-8 sm:w-12 pt-8 flex-shrink-0";
+
+                    const pairsCount = roundMatches.length / 2;
+                    for (let p = 0; p < pairsCount; p++) {
+                        const branchBox = document.createElement('div');
+                        branchBox.className = "flex-1 flex items-center justify-center my-1";
+                        branchBox.innerHTML = `
+                            <svg class="w-full h-full text-slate-300 stroke-current" preserveAspectRatio="none" viewBox="0 0 40 100">
+                                <path d="M 0,25 L 20,25" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M 0,75 L 20,75" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M 20,25 L 20,75" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M 20,50 L 40,50" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+                            </svg>
+                        `;
+                        connectorCol.appendChild(branchBox);
+                    }
+                    display.appendChild(connectorCol);
+                }
+            });
+
+            checkChampion(totalRounds);
+        }
+
+        // Directly set Win / Lose
+        function setWinner(matchId, teamSlot) {
+            let match = null;
+            let rIdx = -1;
+
+            matches.forEach((round, r) => {
+                round.forEach(m => {
+                    if (m.id === matchId) {
+                        match = m;
+                        rIdx = r;
+                    }
+                });
+            });
+
+            if (!match) return;
+
+            const selectedTeam = teamSlot === 1 ? match.team1 : match.team2;
+            if (selectedTeam.name === "BYE" || selectedTeam.name.includes("ผู้ชนะ R")) return;
+
+            match.winner = selectedTeam;
+            propagateWinner(rIdx, matchId, selectedTeam);
+            renderKnockoutUI(matches.length);
+        }
+
+        // Forward winner to next match slot
+        function propagateWinner(currentRoundIdx, matchId, winnerObj) {
+            if (currentRoundIdx + 1 >= matches.length) return;
+
+            const currentRoundMatches = matches[currentRoundIdx];
+            const matchIndex = currentRoundMatches.findIndex(m => m.id === matchId);
+            const nextRoundMatches = matches[currentRoundIdx + 1];
+
+            const nextMatchIdx = Math.floor(matchIndex / 2);
+            const targetMatch = nextRoundMatches[nextMatchIdx];
+            const isTeam1 = (matchIndex % 2 === 0);
+
+            if (targetMatch) {
+                if (isTeam1) {
+                    targetMatch.team1 = winnerObj;
+                } else {
+                    targetMatch.team2 = winnerObj;
+                }
+                targetMatch.winner = null;
+            }
+        }
+
+        // Check and display champion
+        function checkChampion(totalRounds) {
+            const finalMatch = matches[totalRounds - 1] ? matches[totalRounds - 1][0] : null;
+            if (finalMatch && finalMatch.winner && !finalMatch.winner.name.includes("ผู้ชนะ R")) {
+                document.getElementById('champion-banner').classList.remove('hidden');
+                document.getElementById('champion-name').textContent = getDisplayLabel(finalMatch.winner);
+            } else {
+                document.getElementById('champion-banner').classList.add('hidden');
+            }
+        }
+
+        // Round Robin Format Builder
+        function buildRoundRobinStandings() {
+            let pairs = [];
+            for (let i = 0; i < teams.length; i++) {
+                for (let j = i + 1; j < teams.length; j++) {
+                    const swap = Math.random() < 0.5;
+                    const t1 = swap ? j : i;
+                    const t2 = swap ? i : j;
+                    pairs.push({
+                        id: `rr-${i}-${j}`,
+                        t1: t1,
+                        t2: t2,
+                        winner: null
+                    });
+                }
+            }
+            shuffleArray(pairs);
+            rrMatches = pairs;
+
+            renderRoundRobinUI();
+        }
+
+        // Render Round Robin UI (Standings Table + Pairings Cards)
+        function renderRoundRobinUI() {
+            const display = document.getElementById('bracket-display');
+            display.innerHTML = '';
+
+            const totalMatches = rrMatches.length;
+            document.getElementById('stat-matches').textContent = totalMatches;
+
+            const stats = teams.map((team, idx) => {
+                const p = getParticipantObj(team);
+                return {
+                    idx: idx + 1,
+                    name: p.name,
+                    affiliation: p.affiliation,
+                    played: 0,
+                    won: 0,
+                    lost: 0
+                };
+            });
+
+            rrMatches.forEach(m => {
+                if (m.winner !== null) {
+                    stats[m.t1].played++;
+                    stats[m.t2].played++;
+                    if (m.winner === m.t1) {
+                        stats[m.t1].won++;
+                        stats[m.t2].lost++;
+                    } else if (m.winner === m.t2) {
+                        stats[m.t2].won++;
+                        stats[m.t1].lost++;
+                    }
+                }
+            });
+
+            const sortedStats = [...stats].sort((a, b) => b.won - a.won || a.lost - b.lost);
+
+            const container = document.createElement('div');
+            container.className = "w-full max-w-4xl mx-auto space-y-6";
+
+            let html = `
+                <!-- Standings Table -->
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-900 text-sm">ตารางคะแนนพบกันหมด (Standings)</h3>
+                        <span class="text-xs text-slate-500">เรียงตามจำนวนชนะ</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
+                                    <th class="p-3">ลำดับเดิม</th>
+                                    <th class="p-3">ผู้เข้าแข่งขัน</th>
+                                    <th class="p-3">สังกัด / ทีม</th>
+                                    <th class="p-3 text-center">แข่ง</th>
+                                    <th class="p-3 text-center text-emerald-600">ชนะ</th>
+                                    <th class="p-3 text-center text-red-600">แพ้</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+            `;
+
+            sortedStats.forEach((s) => {
+                html += `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="p-3 font-bold text-slate-400">${s.idx}</td>
+                        <td class="p-3 font-medium text-slate-900">${escapeHtml(s.name)}</td>
+                        <td class="p-3 text-slate-500">${escapeHtml(s.affiliation || '-')}</td>
+                        <td class="p-3 text-center text-slate-600">${s.played}</td>
+                        <td class="p-3 text-center text-emerald-600 font-bold">${s.won}</td>
+                        <td class="p-3 text-center text-red-600 font-bold">${s.lost}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Matches List / Pairings -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                    <div class="mb-4 pb-2.5 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-900 text-sm">ตารางจับคู่การแข่งขัน (สุ่มจับคู่ตามลำดับ)</h3>
+                        <button onclick="shuffleRRMatches()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium transition">
+                            สุ่มสลับลำดับการแข่งใหม่
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            `;
+
+            rrMatches.forEach((m, idx) => {
+                const t1Num = m.t1 + 1;
+                const t2Num = m.t2 + 1;
+                const t1Label = getDisplayLabel(teams[m.t1], t1Num);
+                const t2Label = getDisplayLabel(teams[m.t2], t2Num);
+
+                const t1IsWinner = m.winner === m.t1;
+                const t2IsWinner = m.winner === m.t2;
+
+                html += `
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between space-y-2 shadow-xs">
+                        <div class="text-[10px] text-slate-400 font-mono flex justify-between border-b border-slate-100 pb-1">
+                            <span>แมตช์ที่ ${idx + 1}</span>
+                            <span class="text-red-600 font-bold font-sans">${t1Num} พบ ${t2Num}</span>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <!-- Team 1 -->
+                            <button onclick="setRRWinner('${m.id}', ${m.t1})" 
+                                class="w-full flex items-center justify-between p-2 rounded-lg border text-left transition ${t1IsWinner ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : (t2IsWinner ? 'bg-slate-50 border-slate-200 text-slate-400 opacity-60' : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300')}">
+                                <span class="text-xs truncate max-w-[170px]" title="${escapeHtml(t1Label)}">
+                                    ${escapeHtml(t1Label)}
+                                </span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${t1IsWinner ? 'bg-emerald-600 text-white' : (t2IsWinner ? 'bg-slate-200 text-slate-500' : 'bg-white border border-slate-200 text-slate-600')}">
+                                    ${t1IsWinner ? 'ชนะ' : (t2IsWinner ? 'แพ้' : 'กดชนะ')}
+                                </span>
+                            </button>
+
+                            <!-- Team 2 -->
+                            <button onclick="setRRWinner('${m.id}', ${m.t2})" 
+                                class="w-full flex items-center justify-between p-2 rounded-lg border text-left transition ${t2IsWinner ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : (t1IsWinner ? 'bg-slate-50 border-slate-200 text-slate-400 opacity-60' : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300')}">
+                                <span class="text-xs truncate max-w-[170px]" title="${escapeHtml(t2Label)}">
+                                    ${escapeHtml(t2Label)}
+                                </span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${t2IsWinner ? 'bg-emerald-600 text-white' : (t1IsWinner ? 'bg-slate-200 text-slate-500' : 'bg-white border border-slate-200 text-slate-600')}">
+                                    ${t2IsWinner ? 'ชนะ' : (t1IsWinner ? 'แพ้' : 'กดชนะ')}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+            display.appendChild(container);
+        }
+
+        // Set Round Robin Winner
+        function setRRWinner(matchId, winnerIdx) {
+            const match = rrMatches.find(m => m.id === matchId);
+            if (match) {
+                match.winner = (match.winner === winnerIdx) ? null : winnerIdx;
+                renderRoundRobinUI();
+            }
+        }
+
+        // Shuffle Round Robin Match Order
+        function shuffleRRMatches() {
+            shuffleArray(rrMatches);
+            renderRoundRobinUI();
+        }
+
+        // Custom Modal Alert Replacement
+        function alertModal(msg) {
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4";
+            modal.innerHTML = `
+                <div class="bg-white border border-slate-200 rounded-2xl max-w-xs w-full p-5 text-center shadow-xl">
+                    <p class="text-xs text-slate-800 font-medium mb-4">${escapeHtml(msg)}</p>
+                    <button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition">
+                        ตกลง
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // Escape HTML
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
